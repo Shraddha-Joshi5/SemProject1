@@ -10,4 +10,3 @@ print(reg_status)
 print("\n--- Testing Recognition Engine ---")
 # Run a live test search against your newly registered name
 search_status = db.identify_face(mock_vector)
-print(search_status)
