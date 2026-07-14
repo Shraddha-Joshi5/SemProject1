@@ -1,5 +1,5 @@
 import numpy as np
-import database_module as db
+import SemProject1.db.database_module as db
 
 print("--- Testing Registration System ---")
 # Generate a mock 512D embedding vector
