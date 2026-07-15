@@ -1,40 +1,61 @@
+import json
 import psycopg2
 
 def get_db_connection():
     """Manages connection details dynamically for the Docker network environment."""
-    return psycopg2.connect(
-        dbname="facedb",        # Matches your teammate's Docker Compose config
-        user="user",            # Matches your teammate's Docker Compose config
-        password="password",    # Matches your teammate's Docker Compose config
-        host="postgres",        # Routes to the postgres container inside the Docker network
-        port="5432"
-    )
+    # When running on your local machine outside of the Docker network, 
+    # you might need host="localhost". If running inside Docker, keep host="postgres".
+    try:
+        return psycopg2.connect(
+            dbname="facedb",        
+            user="user",            
+            password="password",    
+            port="5432"
+        )
+    except psycopg2.OperationalError:
+        
+        return psycopg2.connect(
+            dbname="facedb",
+            user="user",
+            password="password",
+            host="postgres",
+            port="5432"
+        )
 
-def register_new_face(name, raw_512d_vector):
-    """Inserts a new identity and their 512D face vector into the database."""
+def register_new_face(name, raw_512d_vector, context=None):
+    """
+    Inserts a new identity, their 512D face vector, and optional metadata 
+    context (such as audio transcriptions) into the database.
+    """
+    if context is None:
+        context = {}
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Step 1: Insert the name and get the auto-generated person_id
+        
         cursor.execute(
             "INSERT INTO public.persons (name) VALUES (%s) RETURNING person_id;", 
             (name,)
         )
         person_id = cursor.fetchone()[0]
 
-        # Step 2: Insert the vector linking it to that person_id
+        
         cursor.execute(
-            "INSERT INTO public.face_embeddings (person_id, embedding) VALUES (%s, %s::vector);",
-            (person_id, raw_512d_vector)
+            """
+            INSERT INTO public.face_embeddings (person_id, embedding, context) 
+            VALUES (%s, %s::vector, %s);
+            """,
+            (person_id, raw_512d_vector, json.dumps(context))
         )
 
         conn.commit()
         cursor.close()
         conn.close()
-        return f"✅ Successfully registered {name} (ID: {person_id})"
+        return f" Successfully registered {name} (ID: {person_id})"
     except Exception as e:
-        return f"❌ Registration Error: {e}"
+        return f" Registration Error: {e}"
 
 def identify_face(live_embedding, threshold=0.4):
     """Compares a live 512D camera vector against stored vectors using HNSW Cosine Distance."""
@@ -42,9 +63,9 @@ def identify_face(live_embedding, threshold=0.4):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # SQL query with explicit typecast to resolve the operator error
+        
         query = """
-            SELECT p.name, (f.embedding <=> %s::vector) AS distance
+            SELECT p.name, (f.embedding <=> %s::vector) AS distance, f.context
             FROM public.face_embeddings f
             JOIN public.persons p ON f.person_id = p.person_id
             ORDER BY distance ASC
@@ -58,12 +79,12 @@ def identify_face(live_embedding, threshold=0.4):
         conn.close()
 
         if result:
-            name, distance = result
+            name, distance, context = result
             if distance < threshold:
-                return f"✅ Match: {name} (Distance: {distance:.4f})"
+                return f" Match: {name} (Distance: {distance:.4f}) | Context: {context}"
             else:
-                return f"❌ Unknown Person (Closest guess: {name} with distance {distance:.4f})"
+                return f" Unknown Person (Closest guess: {name} with distance {distance:.4f})"
         else:
-            return "⚠️ Database is currently empty."
+            return " Database is currently empty."
     except Exception as e:
-        return f"❌ Database Query Error: {e}"
+        return f" Database Query Error: {e}"

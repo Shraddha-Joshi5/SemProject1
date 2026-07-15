@@ -2,14 +2,14 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import database_module as db
 
-
+# Initialize the FastAPI application
 app = FastAPI(
     title="Facial Recognition Vector Engine",
     description="FastAPI gateway connecting the camera pipeline to the pgvector database.",
     version="1.0.0"
 )
 
-
+# Define the data structures for validation
 class RegisterSchema(BaseModel):
     name: str
     embedding: list[float]

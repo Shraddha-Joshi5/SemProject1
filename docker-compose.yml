@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # 1. Your Backend Application
   web:
     build: .
     ports:
@@ -8,4 +9,33 @@ services:
     volumes:
       - .:/app
     environment:
-      - ENV=developments
+      - ENV=development
+      - POSTGRES_HOST=postgres
+      - MONGO_HOST=mongodb
+    depends_on:
+      - postgres
+      - mongodb
+
+  # 2. PostgreSQL with pgvector (The Biometric DB)
+  postgres:
+    image: pgvector/pgvector:pg16  # Custom image that comes with pgvector pre-installed!
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: facedb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 3. MongoDB (The Patient Records & Logging DB)
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/var/lib/mongodb/data
+
+volumes:
+  postgres_data:
+  mongo_data:
